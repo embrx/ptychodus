@@ -12,12 +12,17 @@ import threading
 
 import fair_research_login
 import gladier
+from gladier.tools.globus import (
+    GlobusTransfer,
+    GlobusTransferItem,
+    ComputeFunctionType,
+    GlobusComputeState)
 import gladier.managers
 import globus_sdk
 
-from .authorizer import WorkflowAuthorizer
-from .executor import WorkflowExecutor
-from .status import WorkflowStatus, WorkflowStatusRepository
+# from .authorizer import WorkflowAuthorizer
+# from .executor import WorkflowExecutor
+# from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +68,40 @@ class PtychodusClient(gladier.GladierBaseClient):
         'gladier_tools.globus.transfer.Transfer:OutputData',
         # TODO 'gladier_tools.publish.Publish',
     ]
+
+
+def create_flow_definition() -> gladier.GladierBaseState:
+    class PtychodusReconstructState(GlobusComputeState):
+        function_to_call: ComputeFunctionType = ptychodus_reconstruct
+        ptychodus_restart_file: str = "$.input.ptychodus_restart_file"
+        ptychodus_settings_file: str = "$.input.ptychodus_settings_file"
+        ptychodus_results_file: str = "$.input.ptychodus_results_file"
+
+    return (
+        GlobusTransfer(
+            state_name="InputData",
+            source_endpoint_id="$.input.input_data_transfer_source_endpoint_id",
+            destination_endpoint_id="$.input.input_data_transfer_destination_endpoint_id",
+            transfer_items=[
+                GlobusTransferItem(
+                    source_path="$.input.input_data_transfer_source_path",
+                    destination_path="$.input.input_data_transfer_destination_path",
+                    recursive="$.input.input_data_transfer_recursive",
+                )
+            ],
+        )
+        .next(PtychodusReconstructState())
+        .next(GlobusTransfer(state_name="OutputData",
+            source_endpoint_id="$.input.output_data_transfer_source_endpoint_id",
+            destination_endpoint_id="$.input.output_data_transfer_destination_endpoint_id",
+            transfer_items=[
+                GlobusTransferItem(
+                    source_path="$.input.output_data_transfer_source_path",
+                    destination_path="$.input.output_data_transfer_destination_path",
+                    recursive="$.input.output_data_transfer_recursive",
+                )
+            ],))
+    )
 
 
 class CustomCodeHandler(fair_research_login.CodeHandler):
@@ -277,3 +316,21 @@ class GlobusWorkflowThread(threading.Thread):
                 logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
             finally:
                 self._executor.jobQueue.task_done()
+
+def main():
+    client = PtychodusClient()
+    flow_def = client.get_flow_definition()
+    print(f"DEBUG {(flow_def)=}")
+
+    root_state = create_flow_definition()
+    client2 = gladier.GladierClient(
+        flow_definition=root_state.get_flow_definition(),
+        flows_manager=client.flows_manager,
+    )
+    flow_def2 = client2.get_flow_definition()
+    print(f"DEBUG {(flow_def2)=}")
+
+
+if __name__ == "__main__":
+    main()
+                
