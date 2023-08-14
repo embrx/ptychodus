@@ -32,16 +32,18 @@ ScopeAuthorizerMapping = Mapping[str, AuthorizerTypes]
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
 
-def ptychodus_reconstruct(**data: str) -> None:
+def ptychodus_reconstruct(ptychodus_restart_file: str,
+                          ptychodus_settings_file: str,
+                          ptychodus_results_file: str, **kwargs) -> None:
     from pathlib import Path
     from ptychodus.model import ModelArgs, ModelCore
 
     modelArgs = ModelArgs(
-        restartFilePath=Path(data['ptychodus_restart_file']),
-        settingsFilePath=Path(data['ptychodus_settings_file']),
+        restartFilePath=Path(ptychodus_restart_file),
+        settingsFilePath=Path(ptychodus_settings_file),
     )
 
-    resultsFilePath = Path(data['ptychodus_results_file'])
+    resultsFilePath = Path(ptychodus_results_file)
 
     with ModelCore(modelArgs) as model:
         model.batchModeReconstruct(resultsFilePath)
