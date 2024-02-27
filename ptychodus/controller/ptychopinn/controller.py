@@ -20,6 +20,7 @@ class PtychoPINNParametersController:
 
     @classmethod
     def createInstance(cls, modelPresenter: PtychoPINNModelPresenter,
-                       trainingPresenter: PtychoPINNTrainingPresenter, view: PtychoPINNParametersView,
+                       trainingPresenter: PtychoPINNTrainingPresenter,
+                       view: PtychoPINNParametersView,
                        fileDialogFactory: FileDialogFactory) -> PtychoPINNParametersController:
         return cls(modelPresenter, trainingPresenter, view, fileDialogFactory)

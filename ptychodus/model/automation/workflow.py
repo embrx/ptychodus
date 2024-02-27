@@ -88,6 +88,7 @@ class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
         self._reconstructorAPI.ingestTrainingData()
         self._reconstructorAPI.train()
 
+
 #class PtychoPinnTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
 #   TODO
 #    def __init__(self, dataAPI):

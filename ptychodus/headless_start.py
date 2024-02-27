@@ -5,6 +5,7 @@ from model.automation.workflow import PtychoNNTrainingAutomationDatasetWorkflow
 from api.plugins import PluginChooser
 from api.data import DiffractionFileReader
 
+
 def main(hdf5_file_path: str):
     # Initialize necessary components
     fileReaderChooser = PluginChooser[DiffractionFileReader]()
@@ -17,6 +18,7 @@ def main(hdf5_file_path: str):
 
     # Start training
     workflow.execute(Path(hdf5_file_path))
+
 
 if __name__ == "__main__":
     main(sys.argv[1])

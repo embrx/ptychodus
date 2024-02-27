@@ -17,8 +17,9 @@ class PtychoPINNModelParametersController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: PtychoPINNModelPresenter, view: PtychoPINNModelParametersView,
-                       fileDialogFactory: FileDialogFactory) -> PtychoPINNModelParametersController:
+    def createInstance(
+            cls, presenter: PtychoPINNModelPresenter, view: PtychoPINNModelParametersView,
+            fileDialogFactory: FileDialogFactory) -> PtychoPINNModelParametersController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
@@ -31,7 +32,7 @@ class PtychoPINNModelParametersController(Observer):
         view.intensityScaleTrainableCheckBox.toggled.connect(presenter.setIntensityScaleTrainable)
         view.objectBigCheckBox.toggled.connect(presenter.setObjectBig)
         view.probeBigCheckBox.toggled.connect(presenter.setProbeBig)
-        view.probeScaleLineEdit.editingFinished.connect(lambda: presenter.setProbeScale(Decimal(view.probeScaleLineEdit.text())))
+        view.probeScaleLineEdit.valueChanged.connect(lambda value: presenter.setProbeScale(value))
         view.probeMaskCheckBox.toggled.connect(presenter.setProbeMask)
 
         controller._syncModelToView()
@@ -63,14 +64,14 @@ class PtychoPINNModelParametersController(Observer):
         self._view.nFiltersScaleSpinBox.setValue(self._presenter.getNFiltersScale())
         self._view.nPhotonsLineEdit.setValue(self._presenter.getNPhotons())
         self._view.probeTrainableCheckBox.setChecked(self._presenter.isProbeTrainable())
-        self._view.intensityScaleTrainableCheckBox.setChecked(self._presenter.isIntensityScaleTrainable())
+        self._view.intensityScaleTrainableCheckBox.setChecked(
+            self._presenter.isIntensityScaleTrainable())
         self._view.objectBigCheckBox.setChecked(self._presenter.isObjectBig())
         self._view.probeBigCheckBox.setChecked(self._presenter.isProbeBig())
-        self._view.probeScaleLineEdit.setText(str(self._presenter.getProbeScale()))
+        self._view.probeScaleLineEdit.setValue(self._presenter.getProbeScale())
         self._view.probeMaskCheckBox.setChecked(self._presenter.isProbeMask())
         self._view.ampActivationLineEdit.setText(self._presenter.getAmpActivation())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
-from decimal import Decimal

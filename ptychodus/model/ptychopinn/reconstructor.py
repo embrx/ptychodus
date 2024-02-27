@@ -1,20 +1,24 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from ..object import ObjectAPI
-from pathlib import Path
 from importlib.metadata import version
-from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
+from pathlib import Path
+import logging
+
+import numpy
+import numpy.typing
+
+from ptycho.loader import PtychoDataContainer
+
 from ...api.image import ImageExtent
 from ...api.object import ObjectArrayType, ObjectPatchAxis
 from ...api.plot import Plot2D, PlotAxis, PlotSeries
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
-import numpy
-import numpy.typing
-import logging
-from ptycho.loader import PtychoDataContainer
+from ..object import ObjectAPI
+from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
 
 FloatArrayType = numpy.typing.NDArray[numpy.float32]
 logger = logging.getLogger(__name__)
+
 
 class PatternCircularBuffer:
 
@@ -44,6 +48,7 @@ class PatternCircularBuffer:
 
     def getBuffer(self) -> FloatArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
+
 
 class ObjectPatchCircularBuffer:
 
@@ -78,27 +83,23 @@ class ObjectPatchCircularBuffer:
     def getBuffer(self) -> FloatArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
 
+
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
-    def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI) -> None:
+    def __init__(self, modelSettings: PtychoPINNModelSettings,
+                 trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._objectAPI = objectAPI
-        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
-        ptychopinnVersion = version('ptychopinn')
-        logger.info(f'\tPtychoPINN {ptychopinnVersion}')
-        self.modelSettings = modelSettings
-        self.trainingSettings = trainingSettings
-        ptychopinnVersion = version('ptychopinn')
-        logger.info(f'\tPtychoPINN {ptychopinnVersion}')
-        self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
-        self._fileFilterList = ['NumPy Zipped Archive (*.npz)']
-        self.fileFilterList = ['NumPy Arrays (*.npy)', 'NumPy Zipped Archive (*.npz)']
-        self._initialize_ptycho()
+        self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._ptychoDataContainer: PtychoDataContainer | None = None
+        self._fileFilterList: list[str] = ['NumPy Arrays (*.npy)', 'NumPy Zipped Archive (*.npz)']
 
+        ptychopinnVersion = version('ptychopinn')
+        logger.info(f'\tPtychoPINN {ptychopinnVersion}')
 
+        self._initialize_ptycho()
 
     @property
     def name(self) -> str:
@@ -111,13 +112,14 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
         objectGuess = parameters.objectInterpolator.getArray()
-        self._ptychoDataContainer = create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess, scanCoordinates)
+        self._ptychoDataContainer = create_ptycho_data_container(diffractionPatterns, probeGuess,
+                                                                 objectGuess, scanCoordinates)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
-        return self.fileFilterList
+        return self._fileFilterList
 
     def getSaveFileFilter(self) -> str:
-        return self.fileFilterList[0]  # Default to the first option
+        return self._fileFilterList[0]  # Default to the first option
 
     def saveTrainingData(self, filePath: Path) -> None:
         logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
@@ -131,7 +133,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         from .params import update_cfg_from_settings, cfg
         from ptycho import params as ptycho_params
         # Update the configuration for ptycho based on the current settings in ptychodus
-        update_cfg_from_settings(self.modelSettings)
+        update_cfg_from_settings(self._modelSettings, self._trainingSettings)
         # Apply the updated configuration to ptycho's configuration
         ptycho_params.cfg.update(cfg)
 
@@ -142,7 +144,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         else:
             print("Training data has already been ingested. Not running _initialize_ptycho().")
         from ptycho import train_pinn
-        model_instance, history =  train_pinn.train(self._ptychoDataContainer)
+        model_instance, history = train_pinn.train(self._ptychoDataContainer)
         self._model_instance = model_instance
         self._history = history
 
@@ -165,8 +167,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         from scipy.ndimage import map_coordinates
         from ptycho import train_pinn
-        assert self._model_instance
-        #raise NotImplementedError("Reconstruct method is not implemented yet.")
+        assert self._model_instance  # FIXME fail nicely
         # TODO data size/shape requirements to GUI
         data = parameters.diffractionPatternArray
         dataSize = data.shape[-1]
@@ -177,7 +178,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         isDataSizePow2 = (dataSize & (dataSize - 1) == 0 and dataSize > 0)
 
         if not isDataSizePow2:
-            raise ValueError('PtychoPINN expects that the diffraction data size is a power of two!')
+            msg = 'PtychoPINN expects that the diffraction data size is a power of two!'
+            raise ValueError(msg)
 
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
@@ -228,14 +230,15 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             result=0,
         )
 
-def create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess: ObjectArrayType, scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
+
+def create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess: ObjectArrayType,
+                                 scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
     xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
     return PtychoDataContainer.from_raw_data_without_pc(
         xcoords=xcoords,
         ycoords=ycoords,
         diff3d=diffractionPatterns,
         probeGuess=probeGuess,
-        scan_index=numpy.zeros(len(diffractionPatterns)),  # Assuming all patches are from the same object
-        objectGuess=objectGuess
-    )
-
+        # Assuming all patches are from the same object
+        scan_index=numpy.zeros(len(diffractionPatterns)),
+        objectGuess=objectGuess)

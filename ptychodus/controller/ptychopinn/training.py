@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 class PtychoPINNOutputParametersController(Observer):
 
-    def __init__(self, presenter: PtychoPINNTrainingPresenter, view: PtychoPINNOutputParametersView,
+    def __init__(self, presenter: PtychoPINNTrainingPresenter,
+                 view: PtychoPINNOutputParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
@@ -21,9 +22,9 @@ class PtychoPINNOutputParametersController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: PtychoPINNTrainingPresenter,
-                       view: PtychoPINNOutputParametersView,
-                       fileDialogFactory: FileDialogFactory) -> PtychoPINNOutputParametersController:
+    def createInstance(
+            cls, presenter: PtychoPINNTrainingPresenter, view: PtychoPINNOutputParametersView,
+            fileDialogFactory: FileDialogFactory) -> PtychoPINNOutputParametersController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
@@ -74,7 +75,8 @@ class PtychoPINNOutputParametersController(Observer):
 
 class PtychoPINNTrainingParametersController(Observer):
 
-    def __init__(self, presenter: PtychoPINNTrainingPresenter, view: PtychoPINNTrainingParametersView,
+    def __init__(self, presenter: PtychoPINNTrainingPresenter,
+                 view: PtychoPINNTrainingParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter

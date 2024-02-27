@@ -11,12 +11,10 @@ from ...api.reconstructor import (NullReconstructor, Reconstructor, Reconstructo
                                   TrainableReconstructor)
 from ...api.settings import SettingsRegistry
 from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
+from ptychodus.model.object.api import ObjectAPI
 
 logger = logging.getLogger(__name__)
 
-
-
-from ptychodus.model.object.api import ObjectAPI
 
 class PtychoPINNModelPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
@@ -26,25 +24,17 @@ class PtychoPINNModelPresenter(Observable, Observer):
         self._settings = settings
         self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
 
-
     @classmethod
     def createInstance(cls, settings: PtychoPINNModelSettings) -> PtychoPINNModelPresenter:
         presenter = cls(settings)
         settings.addObserver(presenter)
         return presenter
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._settings:
-            self.notifyObservers()
-
-    _fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
-
     def getStateFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
 
     def getStateFileFilter(self) -> str:
         return self._fileFilterList[0]
-
 
     def getGridsizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
@@ -64,13 +54,13 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def getSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
-
     def setStateFilePath(self, path: Path) -> None:
         self._stateFilePath = path
         self.notifyObservers()
 
     def getStateFilePath(self) -> Path:
         return self._stateFilePath
+
 
     def getGridsize(self) -> int:
         return self._settings.gridsize.value
@@ -80,20 +70,17 @@ class PtychoPINNModelPresenter(Observable, Observer):
             self._settings.gridsize.value = value
             self.notifyObservers()
 
-
-
     def getBatchSize(self) -> int:
-        return self._settings.batch_size.value
+        return self._settings.batchSize.value
 
     def setBatchSize(self, value: int) -> None:
-        self._settings.batch_size.value = value
-
+        self._settings.batchSize.value = value
 
     def getNFiltersScale(self) -> int:
-        return self._settings.n_filters_scale.value
+        return self._settings.nFiltersScale.value
 
     def setNFiltersScale(self, value: int) -> None:
-        self._settings.n_filters_scale.value = value
+        self._settings.nFiltersScale.value = value
 
     def getNPhotons(self) -> Decimal:
         return self._settings.nphotons.value
@@ -102,52 +89,65 @@ class PtychoPINNModelPresenter(Observable, Observer):
         self._settings.nphotons.value = value
 
     def isProbeTrainable(self) -> bool:
-        return self._settings.probe_trainable.value
+        return self._settings.probeTrainable.value
 
     def setProbeTrainable(self, enabled: bool) -> None:
-        self._settings.probe_trainable.value = enabled
+        self._settings.probeTrainable.value = enabled
 
     def isIntensityScaleTrainable(self) -> bool:
-        return self._settings.intensity_scale_trainable.value
+        return self._settings.intensityScaleTrainable.value
 
     def setIntensityScaleTrainable(self, enabled: bool) -> None:
-        self._settings.intensity_scale_trainable.value = enabled
+        self._settings.intensityScaleTrainable.value = enabled
 
     def isObjectBig(self) -> bool:
-        return self._settings.object_big.value
+        return self._settings.objectBig.value
 
     def setObjectBig(self, enabled: bool) -> None:
-        self._settings.object_big.value = enabled
+        self._settings.objectBig.value = enabled
 
     def isProbeBig(self) -> bool:
-        return self._settings.probe_big.value
+        return self._settings.probeBig.value
 
     def setProbeBig(self, enabled: bool) -> None:
-        self._settings.probe_big.value = enabled
+        self._settings.probeBig.value = enabled
 
     def getProbeScale(self) -> Decimal:
-        return self._settings.probe_scale.value
+        return self._settings.probeScale.value
 
     def setProbeScale(self, value: Decimal) -> None:
-        self._settings.probe_scale.value = value
+        self._settings.probeScale.value = value
 
     def isProbeMask(self) -> bool:
-        return self._settings.probe_mask.value
+        return self._settings.probeMask.value
 
     def setProbeMask(self, enabled: bool) -> None:
-        self._settings.probe_mask.value = enabled
-
-
+        self._settings.probeMask.value = enabled
 
     def getAmpActivation(self) -> str:
-        return self._settings.amp_activation.value
+        return self._settings.ampActivation.value
 
-    def setAmpActivation(self, amp_activation: str) -> None:
-        self._settings.amp_activation.value = amp_activation
+    def setAmpActivation(self, ampActivation: str) -> None:
+        self._settings.ampActivation.value = ampActivation
 
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.notifyObservers()
 
 
 class PtychoPINNTrainingPresenter(Observable, Observer):
+    MAX_INT: Final[int] = 0x7FFFFFFF
+
+    def __init__(self, settings: PtychoPINNTrainingSettings) -> None:
+        super().__init__()
+        self._settings = settings
+
+    @classmethod
+    def createInstance(cls, settings: PtychoPINNTrainingSettings) -> PtychoPINNTrainingPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
+        return presenter
+
     def setValidationSetFractionalSize(self, value: Decimal) -> None:
         self._settings.validationSetFractionalSize.value = value
 
@@ -201,11 +201,6 @@ class PtychoPINNTrainingPresenter(Observable, Observer):
 
     def getRealspaceWeight(self) -> Decimal:
         return self._settings.realspaceWeight.value
-    MAX_INT: Final[int] = 0x7FFFFFFF
-
-    def __init__(self, settings: PtychoPINNTrainingSettings) -> None:
-        super().__init__()
-        self._settings = settings
 
     def getNEpochs(self) -> int:
         return self._settings.trainingEpochs.value
@@ -256,14 +251,6 @@ class PtychoPINNTrainingPresenter(Observable, Observer):
     def setEpochs(self, value: int) -> None:
         self._settings.trainingEpochs.value = value
 
-    @classmethod
-    def createInstance(cls, settings: PtychoPINNTrainingSettings) -> PtychoPINNTrainingPresenter:
-        presenter = cls(settings)
-        settings.addObserver(presenter)
-        return presenter
-
-    # Methods to interact with training settings have been defined
-
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
@@ -297,13 +284,10 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
             if isDeveloperModeEnabled:
                 reconstructors.append(ptychoPINNReconstructor)
         else:
-            ptychoPINNReconstructor = PtychoPINNTrainableReconstructor(modelSettings,
-                                                                        trainingSettings,
-                                                                        objectAPI)
+            ptychoPINNReconstructor = PtychoPINNTrainableReconstructor(
+                modelSettings, trainingSettings, objectAPI)
             reconstructors.append(ptychoPINNReconstructor)
 
-        return cls(modelSettings, trainingSettings, reconstructors)
-        reconstructors: list[TrainableReconstructor] = [ptychoPINNReconstructor]
         return cls(modelSettings, trainingSettings, reconstructors)
 
     def load_model(self, path: str):

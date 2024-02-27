@@ -18,12 +18,14 @@ class PlotSeries:
     label: str
     values: Sequence[float]
 
+
 @dataclass(frozen=True)
 class PlotUncertainSeries:
     label: str
-    lo:  Sequence[float]
+    lo: Sequence[float]
     values: Sequence[float]
     hi: Sequence[float]
+
 
 @dataclass(frozen=True)
 class PlotAxis:

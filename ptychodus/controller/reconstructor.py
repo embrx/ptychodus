@@ -209,10 +209,8 @@ class ReconstructorParametersController(Observer):
         ax.set_ylabel(axisY.label)
         ax.grid(True)
 
-        if (
-            (len(axisX.series) == len(axisY.series)) or
-            (len(axisX.series) == 1 and len(axisY.series) >= 1)
-        ):
+        if ((len(axisX.series) == len(axisY.series))
+                or (len(axisX.series) == 1 and len(axisY.series) >= 1)):
             for sx, sy in zip(itertools.cycle(axisX.series), axisY.series):
                 ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
                 if hasattr(sy, 'hi') and hasattr(sy, 'lo'):

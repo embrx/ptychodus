@@ -5,9 +5,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QCheckBox, QFormLayout, QGridLayout, QGroupBox, QLabel, QLineEdit,
                              QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
-from .widgets import DecimalLineEdit
-from PyQt5.QtWidgets import QSpinBox
-from .widgets import DecimalSlider
+from .widgets import DecimalLineEdit, DecimalSlider
 
 
 class PtychoPINNModelParametersView(QGroupBox):

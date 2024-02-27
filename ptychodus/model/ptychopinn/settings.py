@@ -10,25 +10,23 @@ class PtychoPINNModelSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        # Define settings specific to PtychoPINN
-        # Example:
         self.learningRate = settingsGroup.createRealEntry('LearningRate', '1e-3')
-        # Importing settings from params.py
         self.N = settingsGroup.createIntegerEntry('N', 64)
         self.offset = settingsGroup.createIntegerEntry('Offset', 4)
         self.gridsize = settingsGroup.createIntegerEntry('Gridsize', 2)
-        self.batch_size = settingsGroup.createIntegerEntry('BatchSize', 16)
-        self.n_filters_scale = settingsGroup.createIntegerEntry('NFiltersScale', 2)
+        self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 16)
+        self.nFiltersScale = settingsGroup.createIntegerEntry('NFiltersScale', 2)
         self.nphotons = settingsGroup.createRealEntry('NPhotons', '1e9')
-        self.probe_trainable = settingsGroup.createBooleanEntry('ProbeTrainable', False)
-        self.intensity_scale_trainable = settingsGroup.createBooleanEntry('IntensityScaleTrainable', False)
-        self.object_big = settingsGroup.createBooleanEntry('ObjectBig', True)
-        self.probe_big = settingsGroup.createBooleanEntry('ProbeBig', False)
-        self.probe_scale = settingsGroup.createRealEntry('ProbeScale', '10.')
-        self.probe_mask = settingsGroup.createBooleanEntry('ProbeMask', True)
-        self.model_type = settingsGroup.createStringEntry('ModelType', 'pinn')
+        self.probeTrainable = settingsGroup.createBooleanEntry('ProbeTrainable', False)
+        self.intensityScaleTrainable = settingsGroup.createBooleanEntry(
+            'IntensityScaleTrainable', False)
+        self.objectBig = settingsGroup.createBooleanEntry('ObjectBig', True)
+        self.probeBig = settingsGroup.createBooleanEntry('ProbeBig', False)
+        self.probeScale = settingsGroup.createRealEntry('ProbeScale', '10.')
+        self.probeMask = settingsGroup.createBooleanEntry('ProbeMask', True)
+        self.modelType = settingsGroup.createStringEntry('ModelType', 'pinn')
         self.size = settingsGroup.createIntegerEntry('Size', 392)
-        self.amp_activation = settingsGroup.createStringEntry('AmpActivation', 'sigmoid')
+        self.ampActivation = settingsGroup.createStringEntry('AmpActivation', 'sigmoid')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoPINNModelSettings:
@@ -49,7 +47,7 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.maeWeight = settingsGroup.createRealEntry('MAEWeight', '0.')
         self.nllWeight = settingsGroup.createRealEntry('NLLWeight', '1.')
-        self.tv_weight = settingsGroup.createRealEntry('TVWeight', '0.')
+        self.tvWeight = settingsGroup.createRealEntry('TVWeight', '0.')
         self.realspaceMAEWeight = settingsGroup.createRealEntry('RealspaceMAEWeight', '0.')
         self.realspaceWeight = settingsGroup.createRealEntry('RealspaceWeight', '0.')
 
@@ -68,13 +66,13 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self.outputPath = settingsGroup.createPathEntry('OutputPath', Path('/path/to/output'))
         self.outputSuffix = settingsGroup.createStringEntry('OutputSuffix', 'suffix')
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
-            self.notifyObservers()
-
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoPINNTrainingSettings:
         settingsGroup = settingsRegistry.createGroup('PtychoPINNTraining')
         settings = cls(settingsGroup)
         settingsGroup.addObserver(settings)
         return settings
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
