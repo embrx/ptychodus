@@ -14,8 +14,8 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
     SIMPLE_NAME: Final[str] = 'LYNXOrchestra'
     MICRONS_TO_METERS: Final[float] = 1.e-6
     DATA_POINT_COLUMN: Final[int] = 0
-    X_COLUMN: Final[int] = 2
-    Y_COLUMN: Final[int] = 5
+    X_COLUMN: Final[int] = 3
+    Y_COLUMN: Final[int] = 6
 
     EXPECTED_HEADER: Final[list[str]] = [
         'DataPoint',
@@ -72,8 +72,8 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
 
                 data_point = int(row[self.DATA_POINT_COLUMN])
                 point = ScanPoint(
-                    x=float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
-                    y=float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
+                    x=-float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
+                    y=-float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
                 )
                 pointSeqMap[data_point].append(point)
 
