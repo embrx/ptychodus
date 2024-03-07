@@ -61,7 +61,6 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def getStateFilePath(self) -> Path:
         return self._stateFilePath
 
-
     def getGridsize(self) -> int:
         return self._settings.gridsize.value
 

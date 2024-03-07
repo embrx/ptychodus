@@ -53,12 +53,12 @@ class PtychoPINNModelParametersController(Observer):
             self._presenter.setStateFilePath(filePath)
 
     def _syncModelToView(self) -> None:
-        modelStateFilePath = self._presenter.getStateFilePath()
+        # FIXME modelStateFilePath = self._presenter.getStateFilePath()
 
-        if modelStateFilePath:
-            self._view.modelStateLineEdit.setText(str(modelStateFilePath))
-        else:
-            self._view.modelStateLineEdit.clear()
+        #if modelStateFilePath:
+        #    self._view.modelStateLineEdit.setText(str(modelStateFilePath))
+        #else:
+        #    self._view.modelStateLineEdit.clear()
 
         self._view.gridSizeSpinBox.setValue(self._presenter.getGridsize())
         self._view.nFiltersScaleSpinBox.setValue(self._presenter.getNFiltersScale())
