@@ -29,6 +29,7 @@ class SLACDiffractionFileReader(DiffractionFileReader):
 
         try:
             patterns = npz['diffraction']
+            patterns = numpy.transpose(patterns[:, :, :], [2, 0, 1])
         except KeyError:
             logger.warning(f'No diffraction patterns in \"{filePath}\"!')
             return SimpleDiffractionDataset.createNullInstance(filePath)
@@ -70,8 +71,8 @@ class SLACScanFileReader(ScanFileReader):
             return TabularScan(pointMap)
 
         try:
-            positionXInMeters = npz['xcoords']
-            positionYInMeters = npz['ycoords']
+            positionXInMeters = npz['xcoords_start']
+            positionYInMeters = npz['ycoords_start']
         except KeyError:
             logger.warning(f'No scan positions in \"{filePath}\"!')
             return TabularScan(pointMap)
