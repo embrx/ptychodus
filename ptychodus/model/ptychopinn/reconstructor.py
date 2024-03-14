@@ -166,7 +166,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         from scipy.ndimage import map_coordinates
-        from ptycho import train_pinn
+        from ptycho import train_pinn, probe
         assert self._model_instance  # FIXME fail nicely
         # TODO data size/shape requirements to GUI
         data = parameters.diffractionPatternArray
@@ -183,6 +183,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
+        probe.set_probe(probeGuess)
         objectGuess = parameters.objectInterpolator.getArray()
         test_data = create_ptycho_data_container(data, probeGuess, objectGuess, scanCoordinates)
         eval_results = train_pinn.eval(test_data, self._history, self._model_instance)
