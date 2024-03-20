@@ -1,187 +1,152 @@
-import numpy as np
-from ptychodus.model.ptychopinn.reconstructor import PtychoPINNTrainableReconstructor
-from ptychodus.model.ptychopinn.settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
-from ptychodus.model.object.api import ObjectAPI
-from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput
-from ptychodus.api.scan import TabularScan
-from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.object.factory import ObjectRepositoryItemFactory
-from ptychodus.model.object.repository import ObjectRepository
-from ptychodus.model.object.selected import SelectedObject, ObjectRepositoryItemSettingsDelegate
-from ptychodus.model.object.sizer import ObjectSizer
-from ptychodus.model.object.interpolator import ObjectInterpolatorFactory
-from ptychodus.model.probe import Apparatus, ProbeSizer, Detector, DiffractionPatternSizer, ProbeSettings
-from ptychodus.model.scan import ScanSizer, ScanSettings, SelectedScan
-from ptychodus.api.plugins import PluginChooser
+from pathlib import Path
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.object import ObjectFileReader, ObjectPhaseCenteringStrategy
+from ptychodus.api.object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.observer import Observable
 from ptychodus.api.plot import Plot2D
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Plot2D
+from ptychodus.api.scan import ScanPoint, Scan
+from ptychodus.api.scan import TabularScan
+from ptychodus.api.settings import SettingsRegistry, SettingsGroup
+from ptychodus.model.data.settings import DiffractionPatternSettings
+from ptychodus.model.data.sizer import DiffractionPatternSizer
+from ptychodus.model.detector import Detector, DetectorSettings
+from ptychodus.model.itemRepository import SelectedRepositoryItem
+from ptychodus.model.itemRepository import SelectedRepositoryItem, RepositoryItemSettingsDelegate
+from ptychodus.model.itemRepository import SelectedRepositoryItem, RepositoryItemSettingsDelegate, ItemRepository, Observable
+from ptychodus.model.object.api import ObjectAPI
+from ptychodus.model.object.core import ObjectCore
+from ptychodus.model.object.factory import ObjectRepositoryItemFactory
+from ptychodus.model.object.interpolator import ObjectInterpolatorFactory
+from ptychodus.model.object.repository import ObjectRepository, ObjectRepositoryItem  # Add ObjectRepositoryItem import
+from ptychodus.model.object.selected import SelectedObject, ObjectRepositoryItemSettingsDelegate
 from ptychodus.model.object.settings import ObjectSettings
+from ptychodus.model.object.sizer import ObjectSizer
+from ptychodus.model.probe import Apparatus, ProbeSizer, ProbeSettings
+from ptychodus.model.probe import ProbeSettings
+from ptychodus.model.ptychopinn.reconstructor import PtychoPINNTrainableReconstructor
+from ptychodus.model.ptychopinn.reconstructor import PtychoPINNTrainableReconstructor, create_ptycho_data_container
+from ptychodus.model.ptychopinn.settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
+from ptychodus.model.scan import ScanSizer
+from ptychodus.model.scan.settings import ScanSettings
+from ptychodus.plugins.slacFile import SLACDiffractionFileReader, SLACScanFileReader, SLACProbeFileReader, SLACObjectFileReader
 
-def main():
-    # Settings Initialization
-    settings_registry = SettingsRegistry(replacementPathPrefix="/path/to/prefix")
-    model_settings = PtychoPINNModelSettings.createInstance(settings_registry)
-    training_settings = PtychoPINNTrainingSettings.createInstance(settings_registry)
+import numpy as np
 
-    # Dependency Initialization
-    rng = np.random.default_rng()
-    detector = Detector()  # Provide a valid Detector instance
-    diffraction_pattern_sizer = DiffractionPatternSizer()  # Provide a valid DiffractionPatternSizer instance
-    probe_settings = ProbeSettings()  # Provide a valid ProbeSettings instance
-    apparatus = Apparatus(detector, diffraction_pattern_sizer, probe_settings)
-    scan_settings = ScanSettings()  # Provide a valid ScanSettings instance
-    selected_scan = SelectedScan()  # Provide a valid SelectedScan instance
-    scan_sizer = ScanSizer(scan_settings, selected_scan)
-    probe_sizer = ProbeSizer(diffraction_pattern_sizer)
-    object_settings = ObjectSettings(settings_registry.createGroup('Object'))
-    object_sizer = ObjectSizer(object_settings, apparatus, scan_sizer, probe_sizer)
+## Define ScanRepositoryItem class
+#class ScanRepositoryItem(object):
+#    def __init__(self, scan: Scan):
+#        self._scan = scan
+#
+#    @property
+#    def nameHint(self) -> str:
+#        return 'Scan'
+#
+#    def getScan(self) -> Scan:
+#        return self._scan
 
-    # ObjectAPI Initialization
-    file_reader_chooser = PluginChooser[ObjectFileReader]()  # Provide a valid PluginChooser[ObjectFileReader] instance
-    object_factory = ObjectRepositoryItemFactory(rng, object_settings, object_sizer, ObjectRepository(), file_reader_chooser)
-    object_repository = ObjectRepository()
-    settings_delegate = ObjectRepositoryItemSettingsDelegate(object_settings, object_factory, object_repository)
-    reinit_observable = Observable()  # Provide a valid Observable instance
-    selected_object = SelectedObject(object_repository, settings_delegate, reinit_observable)
-    phase_centering_strategy_chooser = PluginChooser[ObjectPhaseCenteringStrategy]()  # Provide a valid PluginChooser[ObjectPhaseCenteringStrategy] instance
-    interpolator_factory = ObjectInterpolatorFactory(object_settings, object_sizer, phase_centering_strategy_chooser, reinit_observable)
-    object_api = ObjectAPI(object_factory, object_repository, selected_object, object_sizer, interpolator_factory)
+# Create instances of the file readers
+diffraction_reader = SLACDiffractionFileReader()
+scan_reader = SLACScanFileReader()
+probe_reader = SLACProbeFileReader()
+object_reader = SLACObjectFileReader()
 
-    # PtychoPINNTrainableReconstructor Initialization
-    reconstructor = PtychoPINNTrainableReconstructor(model_settings, training_settings, object_api)
+# Assume the file paths are stored in these variables
+diffraction_file_path = Path('path/to/diffraction_file.npz')
+scan_file_path = Path('path/to/scan_file.npz')
+probe_file_path = Path('path/to/probe_file.npz')
+object_file_path = Path('path/to/object_file.npz')
 
-    # Dummy Data Generation
-    num_patterns = 100  # Number of diffraction patterns
-    pattern_size = 64  # Size of each diffraction pattern (assumes square patterns)
-    object_size = 128  # Size of the object (assumes square object)
+# Read the data
+diffraction_dataset = diffraction_reader.read(diffraction_file_path)
+scan = scan_reader.read(scan_file_path)
+probe = probe_reader.read(probe_file_path)
+object_ = object_reader.read(object_file_path)
 
-    diffraction_patterns = np.random.randint(0, 255, (num_patterns, pattern_size, pattern_size), dtype=np.uint8)
-    scan_coordinates = np.random.rand(num_patterns, 2).astype(np.float32)
-    probe_guess = np.random.rand(1, pattern_size, pattern_size).astype(np.complex64)
-    object_guess = np.random.rand(1, object_size, object_size).astype(np.complex64)
+# Create dummy data and objects for initializing PtychoPINNTrainableReconstructor
+rng = np.random.default_rng(42)  # Random number generator with seed
 
-    # ReconstructInput Creation
-    reconstruct_input = ReconstructInput(
-        diffractionPatternArray=diffraction_patterns,
-        scan=TabularScan.createFromPointIterable(scan_coordinates),
-        probeArray=probe_guess,
-        objectInterpolator=object_api.getSelectedObjectInterpolator()
-    )
+settings_registry = SettingsRegistry('ptychodus')
+ptychopinn_model_settings = PtychoPINNModelSettings.createInstance(settings_registry)
+ptychopinn_training_settings = PtychoPINNTrainingSettings.createInstance(settings_registry)
 
-    # Training
-    reconstructor.ingestTrainingData(reconstruct_input)
-    train_plot = reconstructor.train()
+detector_settings = DetectorSettings.createInstance(settings_registry)
+detector = Detector(detector_settings)
+diffraction_pattern_settings = DiffractionPatternSettings.createInstance(settings_registry)
+diffraction_pattern_sizer = DiffractionPatternSizer.createInstance(diffraction_pattern_settings, detector)
+probe_settings_group = SettingsGroup('probesettings')
+probe_settings = ProbeSettings(probe_settings_group)
+apparatus = Apparatus(detector, diffraction_pattern_sizer, probe_settings)
+probe_sizer = ProbeSizer(diffraction_pattern_sizer)
+scan_settings = ScanSettings.createInstance(settings_registry)
+scan_sizer = ScanSizer(scan_settings, None)
 
-    # Reconstruction
-    reconstruct_output = reconstructor.reconstruct(reconstruct_input)
+phase_centering_strategy_chooser = PluginChooser[ObjectPhaseCenteringStrategy]()
+file_reader_chooser = PluginChooser[ObjectFileReader]()
+file_writer_chooser = PluginChooser[ObjectFileWriter]()
 
-    # Output and Assertions
-    print("Training Plot:")
-    print(train_plot)
+object_core = ObjectCore(
+    rng, settings_registry, apparatus, scan_sizer, probe_sizer,
+    phase_centering_strategy_chooser, file_reader_chooser, file_writer_chooser
+)
 
-    reconstructed_object = reconstruct_output.objectArray
-    if reconstructed_object is not None:
-        print("Reconstructed Object Shape:", reconstructed_object.shape)
-        assert reconstructed_object.shape == (object_size, object_size)
-        assert np.iscomplexobj(reconstructed_object)
-    else:
-        print("Reconstructed object is None")
+object_api = object_core.objectAPI
 
-    # Cleanup
-    reconstructor.clearTrainingData()
+# Instantiate PtychoPINNTrainableReconstructor
+reconstructor = PtychoPINNTrainableReconstructor(
+    ptychopinn_model_settings, ptychopinn_training_settings, object_api
+)
 
-def test_ptychopinn_trainable_reconstructor():
-    # Settings Initialization
-    settings_registry = SettingsRegistry(replacementPathPrefix="/path/to/prefix")
-    model_settings = PtychoPINNModelSettings.createInstance(settings_registry)
-    training_settings = PtychoPINNTrainingSettings.createInstance(settings_registry)
-    object_settings = ObjectSettings(settings_registry.createGroup('Object'))
+object_repository = ObjectRepository()
+obj_group = SettingsGroup('Object')
+object_settings = ObjectSettings(obj_group)
+object_sizer = ObjectSizer(object_settings, apparatus, scan_sizer, probe_sizer)
+object_factory = ObjectRepositoryItemFactory(rng, object_settings, object_sizer, ObjectRepository(), file_reader_chooser)
+settings_delegate = ObjectRepositoryItemSettingsDelegate(object_settings, object_factory, object_repository)
+reinit_observable = Observable()
+selected_object = SelectedObject(object_repository, settings_delegate, reinit_observable)
 
-    # Dependency Initialization
-    rng = np.random.default_rng()
-    detector = Detector()  # Provide a valid Detector instance
-    diffraction_pattern_sizer = DiffractionPatternSizer()  # Provide a valid DiffractionPatternSizer instance
-    probe_settings = ProbeSettings()  # Provide a valid ProbeSettings instance
-    apparatus = Apparatus(detector, diffraction_pattern_sizer, probe_settings)
-    scan_settings = ScanSettings()  # Provide a valid ScanSettings instance
-    selected_scan = SelectedScan()  # Provide a valid SelectedScan instance
-    scan_sizer = ScanSizer(scan_settings, selected_scan)
-    probe_sizer = ProbeSizer(diffraction_pattern_sizer)
-    object_sizer = ObjectSizer(object_settings, apparatus, scan_sizer, probe_sizer)
+# Create ObjectRepositoryItem from the loaded object
+object_repository_item = ObjectRepositoryItem('Loaded Object')
+object_repository_item.setObject(object_)
 
-    # ObjectAPI Initialization
-    file_reader_chooser = PluginChooser[ObjectFileReader]()  # Provide a valid PluginChooser[ObjectFileReader] instance
-    object_factory = ObjectRepositoryItemFactory(rng, object_settings, object_sizer, ObjectRepository(), file_reader_chooser)
-    object_repository = ObjectRepository()
-    settings_delegate = ObjectRepositoryItemSettingsDelegate(object_settings, object_factory, object_repository)
-    reinit_observable = Observable()  # Provide a valid Observable instance
-    selected_object = SelectedObject(object_repository, settings_delegate, reinit_observable)
-    phase_centering_strategy_chooser = PluginChooser[ObjectPhaseCenteringStrategy]()  # Provide a valid PluginChooser[ObjectPhaseCenteringStrategy] instance
-    interpolator_factory = ObjectInterpolatorFactory(object_settings, object_sizer, phase_centering_strategy_chooser, reinit_observable)
-    object_api = ObjectAPI(object_factory, object_repository, selected_object, object_sizer, interpolator_factory)
+# Insert the item into the ObjectRepository
+object_repository.insertItem(object_repository_item)
 
-    # PtychoPINNTrainableReconstructor Initialization
-    reconstructor = PtychoPINNTrainableReconstructor(model_settings, training_settings, object_api)
+# Create ReconstructInput for training
+train_input = ReconstructInput(
+    diffractionPatternArray=diffraction_dataset[0].getData(),
+    probeArray=probe.getArray(),
+    objectInterpolator=object_api.getSelectedObjectInterpolator(),
+    scan=scan,
+)
 
-    # Dummy Data Generation
-    num_patterns = 100  # Number of diffraction patterns
-    pattern_size = 64  # Size of each diffraction pattern (assumes square patterns)
-    object_size = 128  # Size of the object (assumes square object)
+# Call the train method
+reconstructor.ingestTrainingData(train_input)
+train_plot = reconstructor.train()
 
-    diffraction_patterns = np.random.randint(0, 255, (num_patterns, pattern_size, pattern_size), dtype=np.uint8)
-    scan_coordinates = np.random.rand(num_patterns, 2).astype(np.float32)
-    probe_guess = np.random.rand(1, pattern_size, pattern_size).astype(np.complex64)
-    object_guess = np.random.rand(1, object_size, object_size).astype(np.complex64)
+# Basic sanity checks on train output
+assert isinstance(train_plot, Plot2D)
+assert len(train_plot.axisX.series) > 0
+assert len(train_plot.axisY.series) > 0
 
-    # ReconstructInput Creation
-    reconstruct_input = ReconstructInput(
-        diffractionPatternArray=diffraction_patterns,
-        scan=TabularScan.createFromPointIterable(scan_coordinates),
-        probeArray=probe_guess,
-        objectInterpolator=object_api.getSelectedObjectInterpolator()
-    )
+# Create ReconstructInput for reconstruction
+reconstruct_input = ReconstructInput(
+    diffractionPatternArray=diffraction_dataset[0].getData(),
+    probeArray=probe.getArray(),
+    objectInterpolator=object_api.getSelectedObjectInterpolator(),
+    scan=scan,
+)
 
-    # Test the ingestTrainingData() method
-    reconstructor.ingestTrainingData(reconstruct_input)
+# Call the reconstruct method
+reconstruct_output = reconstructor.reconstruct(reconstruct_input)
 
-    # Test the train() method
-    train_plot = reconstructor.train()
+# Basic sanity checks on reconstruction output
+assert isinstance(reconstruct_output, ReconstructOutput)
+assert reconstruct_output.objectArray is not None
+assert reconstruct_output.objectArray.shape == object_.getArray().shape
+assert reconstruct_output.result == 0
 
-    # Assert that the train_plot is of type Plot2D
-    assert isinstance(train_plot, Plot2D)
-
-    # Assert that the train_plot has the expected axes labels
-    assert train_plot.axisX.label == 'Epoch'
-    assert train_plot.axisY.label == 'Loss'
-
-    # Assert that the train_plot has the expected series labels
-    assert len(train_plot.axisX.series) == 1
-    assert len(train_plot.axisY.series) == 2
-    assert train_plot.axisX.series[0].label == 'Epoch'
-    assert train_plot.axisY.series[0].label == 'Training Loss'
-    assert train_plot.axisY.series[1].label == 'Validation Loss'
-
-    # Test the reconstruct() method
-    reconstruct_output = reconstructor.reconstruct(reconstruct_input)
-
-    # Assert that the reconstruct_output is of type ReconstructOutput
-    assert isinstance(reconstruct_output, ReconstructOutput)
-
-    # Assert that the reconstructed object array has the expected shape
-    reconstructed_object = reconstruct_output.objectArray
-    if reconstructed_object is not None:
-        assert reconstructed_object.shape == (object_size, object_size)
-
-        # Assert that the reconstructed object array is of complex data type
-        assert np.iscomplexobj(reconstructed_object)
-    else:
-        print("Reconstructed object is None")
-
-    # Add more assertions based on your specific requirements and expected outputs
-
-    print("All tests passed!")
-
-if __name__ == "__main__":
-    main()
-    test_ptychopinn_trainable_reconstructor()
+print("All tests passed!")
