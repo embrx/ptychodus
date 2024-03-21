@@ -5,6 +5,7 @@ from pathlib import Path
 import logging
 
 import numpy
+np = numpy
 import numpy.typing
 
 from ptycho.loader import PtychoDataContainer
@@ -101,6 +102,14 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         self._initialize_ptycho()
 
+    def appendPatterns(self, patterns: FloatArrayType) -> None:
+        if self._patternBuffer.isZeroSized:
+            extent = ImageExtent(patterns.shape[-2], patterns.shape[-1])
+            self._patternBuffer = PatternCircularBuffer(extent, patterns.shape[0])
+
+        for pattern in patterns:
+            self._patternBuffer.append(pattern)
+
     @property
     def name(self) -> str:
         return 'AmplitudePhase'
@@ -108,11 +117,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        diffractionPatterns = self._patternBuffer.getBuffer()
+        self.appendPatterns(parameters.diffractionPatternArray)
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
         objectGuess = parameters.objectInterpolator.getArray()
-        self._ptychoDataContainer = create_ptycho_data_container(diffractionPatterns, probeGuess,
+        self._ptychoDataContainer = create_ptycho_data_container(self._patternBuffer.getBuffer(), probeGuess,
                                                                  objectGuess, scanCoordinates)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
@@ -181,11 +190,13 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             msg = 'PtychoPINN expects that the diffraction data size is a power of two!'
             raise ValueError(msg)
 
+
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
         probe.set_probe(probeGuess)
         objectGuess = parameters.objectInterpolator.getArray()
-        test_data = create_ptycho_data_container(data, probeGuess, objectGuess, scanCoordinates)
+        self.ingestTrainingData(parameters)
+        test_data = create_ptycho_data_container(self._patternBuffer.getBuffer(), probeGuess, objectGuess, scanCoordinates)
         eval_results = train_pinn.eval(test_data, self._history, self._model_instance)
         objectPatches = eval_results['reconstructed_obj'][:, :, :, 0]
         self._eval_output = eval_results
@@ -234,7 +245,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
 def create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess: ObjectArrayType,
                                  scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
-    xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
+    xcoords = np.array([p.x for p in scanCoordinates])
+    ycoords = np.array([p.y for p in scanCoordinates])
     return PtychoDataContainer.from_raw_data_without_pc(
         xcoords=xcoords,
         ycoords=ycoords,
