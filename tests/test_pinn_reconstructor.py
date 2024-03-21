@@ -1,51 +1,56 @@
 from pathlib import Path
-from ptychodus.api.image import ImageExtent
-from ptychodus.api.object import ObjectFileReader, ObjectPhaseCenteringStrategy
-from ptychodus.api.object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
+import numpy as np
+from ptychodus.api.plugins import PluginChooser, PluginRegistry
 from ptychodus.api.observer import Observable
-from ptychodus.api.plot import Plot2D
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput
-from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Plot2D
-from ptychodus.api.scan import ScanPoint, Scan
-from ptychodus.api.scan import TabularScan
 from ptychodus.api.settings import SettingsRegistry, SettingsGroup
+from ptychodus.api.plot import Plot2D
 from ptychodus.model.data.settings import DiffractionPatternSettings
 from ptychodus.model.data.sizer import DiffractionPatternSizer
 from ptychodus.model.detector import Detector, DetectorSettings
 from ptychodus.model.itemRepository import SelectedRepositoryItem
-from ptychodus.model.itemRepository import SelectedRepositoryItem, RepositoryItemSettingsDelegate
-from ptychodus.model.itemRepository import SelectedRepositoryItem, RepositoryItemSettingsDelegate, ItemRepository, Observable
 from ptychodus.model.object.api import ObjectAPI
-from ptychodus.model.object.core import ObjectCore
 from ptychodus.model.object.factory import ObjectRepositoryItemFactory
 from ptychodus.model.object.interpolator import ObjectInterpolatorFactory
-from ptychodus.model.object.repository import ObjectRepository, ObjectRepositoryItem  # Add ObjectRepositoryItem import
-from ptychodus.model.object.selected import SelectedObject, ObjectRepositoryItemSettingsDelegate
+from ptychodus.model.object.repository import ObjectRepository, ObjectRepositoryItem
+from ptychodus.model.object.selected import ObjectRepositoryItemSettingsDelegate, SelectedObject
 from ptychodus.model.object.settings import ObjectSettings
 from ptychodus.model.object.sizer import ObjectSizer
 from ptychodus.model.probe import Apparatus, ProbeSizer, ProbeSettings
-from ptychodus.model.probe import ProbeSettings
 from ptychodus.model.ptychopinn.reconstructor import PtychoPINNTrainableReconstructor
-from ptychodus.model.ptychopinn.reconstructor import PtychoPINNTrainableReconstructor, create_ptycho_data_container
 from ptychodus.model.ptychopinn.settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
 from ptychodus.model.scan import ScanSizer
+from ptychodus.model.scan.repository import ScanRepository, ScanRepositoryItem
+from ptychodus.model.scan.factory import ScanRepositoryItemFactory
+from ptychodus.model.scan.selected import ScanRepositoryItemSettingsDelegate, SelectedScan
 from ptychodus.model.scan.settings import ScanSettings
 from ptychodus.plugins.slacFile import SLACDiffractionFileReader, SLACScanFileReader, SLACProbeFileReader, SLACObjectFileReader
+from ptychodus.plugins.objectPhaseCentering import IdentityPhaseCenteringStrategy, CenterBoxMeanPhaseCenteringStrategy
 
-import numpy as np
+# Assume the file path is stored in this variable
+data_file_path = Path('/home/ollie/Documents/scratch/ptycho/ptycho/datasets/Run1084_recon3_postPC_shrunk_3.npz')
 
-## Define ScanRepositoryItem class
-#class ScanRepositoryItem(object):
-#    def __init__(self, scan: Scan):
-#        self._scan = scan
-#
-#    @property
-#    def nameHint(self) -> str:
-#        return 'Scan'
-#
-#    def getScan(self) -> Scan:
-#        return self._scan
+# Read the data from the NPZ file
+with np.load(data_file_path) as data:
+    diffraction_patterns = data['diffraction']
+    probe_array = data['probeGuess']
+    object_array = data['objectGuess']
+    xcoords_start = data['xcoords_start']
+    ycoords_start = data['ycoords_start']
+
+# Split the data into separate files
+diffraction_file_path = data_file_path.with_name('diffraction_file.npz')
+np.savez(diffraction_file_path, diffraction=diffraction_patterns)
+
+probe_file_path = data_file_path.with_name('probe_file.npz')
+np.savez(probe_file_path, probeGuess=probe_array)
+
+object_file_path = data_file_path.with_name('object_file.npz')
+np.savez(object_file_path, objectGuess=object_array)
+
+scan_file_path = data_file_path.with_name('scan_file.npz')
+np.savez(scan_file_path, xcoords_start=xcoords_start, ycoords_start=ycoords_start)
 
 # Create instances of the file readers
 diffraction_reader = SLACDiffractionFileReader()
@@ -53,13 +58,7 @@ scan_reader = SLACScanFileReader()
 probe_reader = SLACProbeFileReader()
 object_reader = SLACObjectFileReader()
 
-# Assume the file paths are stored in these variables
-diffraction_file_path = Path('path/to/diffraction_file.npz')
-scan_file_path = Path('path/to/scan_file.npz')
-probe_file_path = Path('path/to/probe_file.npz')
-object_file_path = Path('path/to/object_file.npz')
-
-# Read the data
+# Read the data using the SLAC file readers
 diffraction_dataset = diffraction_reader.read(diffraction_file_path)
 scan = scan_reader.read(scan_file_path)
 probe = probe_reader.read(probe_file_path)
@@ -81,32 +80,48 @@ probe_settings = ProbeSettings(probe_settings_group)
 apparatus = Apparatus(detector, diffraction_pattern_sizer, probe_settings)
 probe_sizer = ProbeSizer(diffraction_pattern_sizer)
 scan_settings = ScanSettings.createInstance(settings_registry)
-scan_sizer = ScanSizer(scan_settings, None)
 
-phase_centering_strategy_chooser = PluginChooser[ObjectPhaseCenteringStrategy]()
-file_reader_chooser = PluginChooser[ObjectFileReader]()
+# Register phase centering strategy plugins
+plugin_registry = PluginRegistry()
+plugin_registry.objectPhaseCenteringStrategies.registerPlugin(IdentityPhaseCenteringStrategy(), simpleName='Identity')
+plugin_registry.objectPhaseCenteringStrategies.registerPlugin(CenterBoxMeanPhaseCenteringStrategy(), simpleName='CenterBoxMean')
+
+# Create SelectedScan instance
+scan_repository = ScanRepository()
+scan_file_reader_chooser = PluginChooser[SLACScanFileReader]()
+scan_item_factory = ScanRepositoryItemFactory(rng, scan_settings, scan_file_reader_chooser)
+scan_settings_delegate = ScanRepositoryItemSettingsDelegate(scan_settings, scan_item_factory, scan_repository)
+selected_scan = SelectedScan.createInstance(scan_repository, scan_settings_delegate, settings_registry)
+
+scan_sizer = ScanSizer.createInstance(scan_settings, selected_scan)
+
+phase_centering_strategy_chooser = plugin_registry.objectPhaseCenteringStrategies
 file_writer_chooser = PluginChooser[ObjectFileWriter]()
 
-object_core = ObjectCore(
-    rng, settings_registry, apparatus, scan_sizer, probe_sizer,
-    phase_centering_strategy_chooser, file_reader_chooser, file_writer_chooser
+object_settings_group = SettingsGroup('objectsettings')
+object_settings = ObjectSettings(object_settings_group)
+object_sizer = ObjectSizer(object_settings, apparatus, scan_sizer, probe_sizer)
+
+reinit_observable = Observable()
+interpolator_factory = ObjectInterpolatorFactory.createInstance(
+    object_settings,
+    object_sizer,
+    phase_centering_strategy_chooser,
+    reinit_observable
 )
 
-object_api = object_core.objectAPI
+object_repository = ObjectRepository()
+object_file_reader_chooser = PluginChooser[SLACObjectFileReader]()
+object_factory = ObjectRepositoryItemFactory(rng, object_settings, object_sizer, object_repository, object_file_reader_chooser)
+settings_delegate = ObjectRepositoryItemSettingsDelegate(object_settings, object_factory, object_repository)
+selected_object = SelectedObject(object_repository, settings_delegate, reinit_observable)
+
+object_api = ObjectAPI(object_factory, object_repository, selected_object, object_sizer, interpolator_factory)
 
 # Instantiate PtychoPINNTrainableReconstructor
 reconstructor = PtychoPINNTrainableReconstructor(
     ptychopinn_model_settings, ptychopinn_training_settings, object_api
 )
-
-object_repository = ObjectRepository()
-obj_group = SettingsGroup('Object')
-object_settings = ObjectSettings(obj_group)
-object_sizer = ObjectSizer(object_settings, apparatus, scan_sizer, probe_sizer)
-object_factory = ObjectRepositoryItemFactory(rng, object_settings, object_sizer, ObjectRepository(), file_reader_chooser)
-settings_delegate = ObjectRepositoryItemSettingsDelegate(object_settings, object_factory, object_repository)
-reinit_observable = Observable()
-selected_object = SelectedObject(object_repository, settings_delegate, reinit_observable)
 
 # Create ObjectRepositoryItem from the loaded object
 object_repository_item = ObjectRepositoryItem('Loaded Object')
@@ -114,6 +129,8 @@ object_repository_item.setObject(object_)
 
 # Insert the item into the ObjectRepository
 object_repository.insertItem(object_repository_item)
+
+selected_object.selectItem(object_repository_item.nameHint)
 
 # Create ReconstructInput for training
 train_input = ReconstructInput(
