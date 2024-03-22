@@ -31,7 +31,7 @@ cfg: dict[str, Any] = {
     'nphotons': 1e9,
     'nimgs_train': 9,
     'nimgs_test': 3,
-    'data_source': 'lines',
+    'data_source': 'generic',
     'probe.trainable': False,
     'intensity_scale.trainable': False,
     'positions.provided': False,

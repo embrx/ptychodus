@@ -147,13 +147,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         ptycho_params.cfg.update(cfg)
 
     def train(self) -> Plot2D:
-        if self._ptychoDataContainer is None:
-            print("Training data has not been ingested. running _initialize_ptycho().")
-            self._initialize_ptycho()
-        else:
-            print("Training data has already been ingested. Not running _initialize_ptycho().")
+        self._initialize_ptycho()
         from ptycho import train_pinn
-        model_instance, history = train_pinn.train(self._ptychoDataContainer)
+        intensity_scale = train_pinn.calculate_intensity_scale(self._ptychoDataContainer)
+        model_instance, history = train_pinn.train(self._ptychoDataContainer, intensity_scale)
         self._model_instance = model_instance
         self._history = history
 
@@ -247,11 +244,13 @@ def create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess: O
                                  scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
     xcoords = np.array([p.x for p in scanCoordinates])
     ycoords = np.array([p.y for p in scanCoordinates])
+    if objectGuess is not None:
+        objectGuess = objectGuess[0, :, :]
     return PtychoDataContainer.from_raw_data_without_pc(
         xcoords=xcoords,
         ycoords=ycoords,
         diff3d=diffractionPatterns,
-        probeGuess=probeGuess,
+        probeGuess=probeGuess[0, :, :],
         # Assuming all patches are from the same object
         scan_index=numpy.zeros(len(diffractionPatterns)),
         objectGuess=objectGuess)
