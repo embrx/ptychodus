@@ -117,6 +117,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
+        # TODO assert this wasn't already called
         self.appendPatterns(parameters.diffractionPatternArray)
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
@@ -187,12 +188,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             msg = 'PtychoPINN expects that the diffraction data size is a power of two!'
             raise ValueError(msg)
 
-
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
         probe.set_probe(probeGuess)
         objectGuess = parameters.objectInterpolator.getArray()
-        self.ingestTrainingData(parameters)
+
         test_data = create_ptycho_data_container(self._patternBuffer.getBuffer(), probeGuess, objectGuess, scanCoordinates)
         eval_results = train_pinn.eval(test_data, self._history, self._model_instance)
         objectPatches = eval_results['reconstructed_obj'][:, :, :, 0]

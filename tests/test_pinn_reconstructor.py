@@ -39,18 +39,32 @@ with np.load(data_file_path) as data:
     xcoords_start = data['xcoords_start']
     ycoords_start = data['ycoords_start']
 
-# Split the data into separate files
-diffraction_file_path = data_file_path.with_name('diffraction_file.npz')
-np.savez(diffraction_file_path, diffraction=diffraction_patterns)
+# Split the data into train and reconstruct subsets 
+train_size = 512
 
-probe_file_path = data_file_path.with_name('probe_file.npz')
-np.savez(probe_file_path, probeGuess=probe_array)
+train_diffraction_file_path = data_file_path.with_name('train_diffraction_file.npz')
+np.savez(train_diffraction_file_path, diffraction=diffraction_patterns[:, :, :train_size])
 
-object_file_path = data_file_path.with_name('object_file.npz')
-np.savez(object_file_path, objectGuess=object_array)
+train_probe_file_path = data_file_path.with_name('train_probe_file.npz') 
+np.savez(train_probe_file_path, probeGuess=probe_array)
 
-scan_file_path = data_file_path.with_name('scan_file.npz')
-np.savez(scan_file_path, xcoords_start=xcoords_start, ycoords_start=ycoords_start)
+train_object_file_path = data_file_path.with_name('train_object_file.npz')
+np.savez(train_object_file_path, objectGuess=object_array)
+
+train_scan_file_path = data_file_path.with_name('train_scan_file.npz')
+np.savez(train_scan_file_path, xcoords_start=xcoords_start[:train_size], ycoords_start=ycoords_start[:train_size])
+
+reconstruct_diffraction_file_path = data_file_path.with_name('reconstruct_diffraction_file.npz')
+np.savez(reconstruct_diffraction_file_path, diffraction=diffraction_patterns)
+
+reconstruct_probe_file_path = data_file_path.with_name('reconstruct_probe_file.npz')
+np.savez(reconstruct_probe_file_path, probeGuess=probe_array)
+
+reconstruct_object_file_path = data_file_path.with_name('reconstruct_object_file.npz') 
+np.savez(reconstruct_object_file_path, objectGuess=object_array)
+
+reconstruct_scan_file_path = data_file_path.with_name('reconstruct_scan_file.npz')
+np.savez(reconstruct_scan_file_path, xcoords_start=xcoords_start, ycoords_start=ycoords_start)
 
 # Create instances of the file readers
 diffraction_reader = SLACDiffractionFileReader()
@@ -58,11 +72,17 @@ scan_reader = SLACScanFileReader()
 probe_reader = SLACProbeFileReader()
 object_reader = SLACObjectFileReader()
 
-# Read the data using the SLAC file readers
-diffraction_dataset = diffraction_reader.read(diffraction_file_path)
-scan = scan_reader.read(scan_file_path)
-probe = probe_reader.read(probe_file_path)
-object_ = object_reader.read(object_file_path)
+# Read the train data using the SLAC file readers
+train_diffraction_dataset = diffraction_reader.read(train_diffraction_file_path)
+train_scan = scan_reader.read(train_scan_file_path)
+train_probe = probe_reader.read(train_probe_file_path)
+train_object = object_reader.read(train_object_file_path)
+
+# Read the reconstruct data using the SLAC file readers  
+reconstruct_diffraction_dataset = diffraction_reader.read(reconstruct_diffraction_file_path)
+reconstruct_scan = scan_reader.read(reconstruct_scan_file_path)  
+reconstruct_probe = probe_reader.read(reconstruct_probe_file_path)
+reconstruct_object = object_reader.read(reconstruct_object_file_path)
 
 # Create dummy data and objects for initializing PtychoPINNTrainableReconstructor
 rng = np.random.default_rng(42)  # Random number generator with seed
@@ -74,7 +94,7 @@ ptychopinn_model_settings.gridsize.value = 1
 
 detector_settings = DetectorSettings.createInstance(settings_registry)
 detector = Detector(detector_settings)
-diffraction_pattern_settings = DiffractionPatternSettings.createInstance(settings_registry)
+diffraction_pattern_settings = DiffractionPatternSettings.createInstance(settings_registry)  
 diffraction_pattern_sizer = DiffractionPatternSizer.createInstance(diffraction_pattern_settings, detector)
 probe_settings_group = SettingsGroup('probesettings')
 probe_settings = ProbeSettings(probe_settings_group)
@@ -84,7 +104,7 @@ scan_settings = ScanSettings.createInstance(settings_registry)
 
 # Register phase centering strategy plugins
 plugin_registry = PluginRegistry()
-plugin_registry.objectPhaseCenteringStrategies.registerPlugin(IdentityPhaseCenteringStrategy(), simpleName='Identity')
+plugin_registry.objectPhaseCenteringStrategies.registerPlugin(IdentityPhaseCenteringStrategy(), simpleName='Identity') 
 plugin_registry.objectPhaseCenteringStrategies.registerPlugin(CenterBoxMeanPhaseCenteringStrategy(), simpleName='CenterBoxMean')
 
 # Create SelectedScan instance
@@ -105,7 +125,7 @@ object_sizer = ObjectSizer(object_settings, apparatus, scan_sizer, probe_sizer)
 
 reinit_observable = Observable()
 interpolator_factory = ObjectInterpolatorFactory.createInstance(
-    object_settings,
+    object_settings, 
     object_sizer,
     phase_centering_strategy_chooser,
     reinit_observable
@@ -119,30 +139,30 @@ selected_object = SelectedObject(object_repository, settings_delegate, reinit_ob
 
 object_api = ObjectAPI(object_factory, object_repository, selected_object, object_sizer, interpolator_factory)
 
-# Instantiate PtychoPINNTrainableReconstructor
+# Instantiate PtychoPINNTrainableReconstructor  
 reconstructor = PtychoPINNTrainableReconstructor(
     ptychopinn_model_settings, ptychopinn_training_settings, object_api
 )
 
-# Create ObjectRepositoryItem from the loaded object
-object_repository_item = ObjectRepositoryItem('Loaded Object')
-object_repository_item.setObject(object_)
+# Create ObjectRepositoryItem from the loaded train object
+train_object_repository_item = ObjectRepositoryItem('Loaded Train Object')
+train_object_repository_item.setObject(train_object)
 
 # Insert the item into the ObjectRepository
-object_repository.insertItem(object_repository_item)
+object_repository.insertItem(train_object_repository_item)
 
-selected_object.selectItem(object_repository_item.nameHint)
+selected_object.selectItem(train_object_repository_item.nameHint)
 
 # Create ReconstructInput for training
 train_input = ReconstructInput(
-    diffractionPatternArray=diffraction_dataset[0].getData(),
-    probeArray=probe.getArray(),
+    diffractionPatternArray=train_diffraction_dataset[0].getData(),
+    probeArray=train_probe.getArray(),
     objectInterpolator=object_api.getSelectedObjectInterpolator(),
-    scan=scan,
+    scan=train_scan,
 )
 
 # Call the train method
-reconstructor.ingestTrainingData(train_input)
+reconstructor.ingestTrainingData(train_input)  
 train_plot = reconstructor.train()
 
 # Basic sanity checks on train output
@@ -150,12 +170,21 @@ assert isinstance(train_plot, Plot2D)
 assert len(train_plot.axisX.series) > 0
 assert len(train_plot.axisY.series) > 0
 
+# Create ObjectRepositoryItem from the loaded reconstruct object
+reconstruct_object_repository_item = ObjectRepositoryItem('Loaded Reconstruct Object')
+reconstruct_object_repository_item.setObject(reconstruct_object)
+
+# Insert the item into the ObjectRepository
+object_repository.insertItem(reconstruct_object_repository_item)
+
+selected_object.selectItem(reconstruct_object_repository_item.nameHint)  
+
 # Create ReconstructInput for reconstruction
-reconstruct_input = ReconstructInput(
-    diffractionPatternArray=diffraction_dataset[0].getData(),
-    probeArray=probe.getArray(),
+reconstruct_input = ReconstructInput( 
+    diffractionPatternArray=reconstruct_diffraction_dataset[0].getData(),
+    probeArray=reconstruct_probe.getArray(),
     objectInterpolator=object_api.getSelectedObjectInterpolator(),
-    scan=scan,
+    scan=reconstruct_scan,
 )
 
 # Call the reconstruct method
@@ -163,8 +192,8 @@ reconstruct_output = reconstructor.reconstruct(reconstruct_input)
 
 # Basic sanity checks on reconstruction output
 assert isinstance(reconstruct_output, ReconstructOutput)
-assert reconstruct_output.objectArray is not None
-assert reconstruct_output.objectArray.shape == object_.getArray().shape
+assert reconstruct_output.objectArray is not None  
+assert reconstruct_output.objectArray.shape == reconstruct_object.getArray().shape
 assert reconstruct_output.result == 0
 
 print("All tests passed!")
