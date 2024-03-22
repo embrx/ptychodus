@@ -90,7 +90,10 @@ rng = np.random.default_rng(42)  # Random number generator with seed
 settings_registry = SettingsRegistry('ptychodus')
 ptychopinn_model_settings = PtychoPINNModelSettings.createInstance(settings_registry)
 ptychopinn_training_settings = PtychoPINNTrainingSettings.createInstance(settings_registry)
+
+# Setting reconstruction parameters
 ptychopinn_model_settings.gridsize.value = 1
+ptychopinn_model_settings.probeScale.value = 5.
 
 detector_settings = DetectorSettings.createInstance(settings_registry)
 detector = Detector(detector_settings)

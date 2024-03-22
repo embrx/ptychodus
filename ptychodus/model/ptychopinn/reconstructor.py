@@ -116,6 +116,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
+#probe.set_probe_guess(None, probeGuess)
+    #def _set_probe(self, self, parameters: ReconstructInput) -> None:
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         # TODO assert this wasn't already called
         self.appendPatterns(parameters.diffractionPatternArray)
@@ -190,7 +192,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
-        probe.set_probe(probeGuess)
+        #probe.set_probe(probeGuess)
         objectGuess = parameters.objectInterpolator.getArray()
 
         test_data = create_ptycho_data_container(self._patternBuffer.getBuffer(), probeGuess, objectGuess, scanCoordinates)
