@@ -17,7 +17,7 @@ from ptychodus.api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
-class SLACDiffractionFileReader(DiffractionFileReader):
+class SLAC_NPZDiffractionFileReader(DiffractionFileReader):
 
     def read(self, filePath: Path) -> DiffractionDataset:
 
@@ -59,7 +59,7 @@ class SLACDiffractionFileReader(DiffractionFileReader):
         return SimpleDiffractionDataset(metadata, contentsTree, [array])
 
 
-class SLACScanFileReader(ScanFileReader):
+class SLAC_NPZScanFileReader(ScanFileReader):
 
     def read(self, filePath: Path) -> Scan:
         pointMap: dict[int, ScanPoint] = dict()
@@ -83,7 +83,7 @@ class SLACScanFileReader(ScanFileReader):
         return TabularScan(pointMap)
 
 
-class SLACProbeFileReader(ProbeFileReader):
+class SLAC_NPZProbeFileReader(ProbeFileReader):
 
     def read(self, filePath: Path) -> Probe:
         try:
@@ -101,7 +101,7 @@ class SLACProbeFileReader(ProbeFileReader):
         return Probe(array)
 
 
-class SLACObjectFileReader(ObjectFileReader):
+class SLAC_NPZObjectFileReader(ObjectFileReader):
 
     def read(self, filePath: Path) -> Object:
         try:
@@ -120,26 +120,26 @@ class SLACObjectFileReader(ObjectFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    SIMPLE_NAME: Final[str] = 'SLAC'
+    SIMPLE_NAME: Final[str] = 'SLAC_NPZ'
     DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'
 
     registry.diffractionFileReaders.registerPlugin(
-        SLACDiffractionFileReader(),
+        SLAC_NPZDiffractionFileReader(),
         simpleName=SIMPLE_NAME,
         displayName=DISPLAY_NAME,
     )
     registry.scanFileReaders.registerPlugin(
-        SLACScanFileReader(),
+        SLAC_NPZScanFileReader(),
         simpleName=SIMPLE_NAME,
         displayName=DISPLAY_NAME,
     )
     registry.probeFileReaders.registerPlugin(
-        SLACProbeFileReader(),
+        SLAC_NPZProbeFileReader(),
         simpleName=SIMPLE_NAME,
         displayName=DISPLAY_NAME,
     )
     registry.objectFileReaders.registerPlugin(
-        SLACObjectFileReader(),
+        SLAC_NPZObjectFileReader(),
         simpleName=SIMPLE_NAME,
         displayName=DISPLAY_NAME,
     )
