@@ -177,6 +177,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         from scipy.ndimage import map_coordinates
         from ptycho import train_pinn, probe
         assert self._model_instance  # FIXME fail nicely
+
         # TODO data size/shape requirements to GUI
         data = parameters.diffractionPatternArray
         dataSize = data.shape[-1]
@@ -192,10 +193,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         probeGuess = parameters.probeArray
-        #probe.set_probe(probeGuess)
         objectGuess = parameters.objectInterpolator.getArray()
 
-        test_data = create_ptycho_data_container(self._patternBuffer.getBuffer(), probeGuess, objectGuess, scanCoordinates)
+        test_data = create_ptycho_data_container(data, probeGuess, objectGuess, scanCoordinates)
         eval_results = train_pinn.eval(test_data, self._history, self._model_instance)
         objectPatches = eval_results['reconstructed_obj'][:, :, :, 0]
         self._eval_output = eval_results
@@ -206,6 +206,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         objectInterpolator = parameters.objectInterpolator
         objectGrid = objectInterpolator.getGrid()
         objectArray = objectInterpolator.getArray()
+
+        print("Shape of objectArray:", objectArray.shape)
+        print("objectInterpolator:", objectInterpolator)
+
         objectArrayUpper = numpy.zeros_like(objectArray, dtype=complex)
         objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
 
@@ -215,15 +219,19 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         )
 
         for scanPoint, objectPatch in zip(parameters.scan.values(), objectPatches):
-
             patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
             patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
 
             pixelCentersX = patchAxisX.getObjectPixelCenters()
             pixelCentersY = patchAxisY.getObjectPixelCenters()
 
+            print("pixelCentersY.objectSlice:", pixelCentersY.objectSlice)
+            print("pixelCentersX.objectSlice:", pixelCentersX.objectSlice)
+
             xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
             patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
+
+            print("Shape of patchValues:", patchValues.shape)
 
             # TODO consider inverse distance weighting
             objectArrayUpper[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += patchValues
@@ -241,9 +249,54 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             result=0,
         )
 
+#        logger.debug('Stitching...')
+#        objectInterpolator = parameters.objectInterpolator
+#        objectGrid = objectInterpolator.getGrid()
+#        objectArray = objectInterpolator.getArray()
+#        objectArrayUpper = numpy.zeros_like(objectArray, dtype=complex)
+#        objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
+#
+#        patchExtent = ImageExtent(
+#            width=objectPatches.shape[-1],
+#            height=objectPatches.shape[-2],
+#        )
+#
+#        for scanPoint, objectPatch in zip(parameters.scan.values(), objectPatches):
+#
+#            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
+#            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
+#
+#            pixelCentersX = patchAxisX.getObjectPixelCenters()
+#            pixelCentersY = patchAxisY.getObjectPixelCenters()
+#
+#            xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
+#            patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
+#
+#            # TODO consider inverse distance weighting
+#            objectArrayUpper[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += patchValues
+#            objectArrayCount[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += 1
+#
+#        objectArrayLower = numpy.maximum(objectArrayCount, 1)
+#        objectArray = objectArrayUpper / objectArrayLower
+#
+#        return ReconstructOutput(
+#            scan=None,
+#            probeArray=None,
+#            objectArray=objectArray,
+#            objective=[[]],
+#            plot2D=Plot2D.createNull(),  # TODO show something here?
+#            result=0,
+#        )
+
 
 def create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess: ObjectArrayType,
                                  scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
+    print("create_ptycho_data_container pre-condition sizes:")
+    print(f"diffractionPatterns: {diffractionPatterns.shape}")
+    print(f"probeGuess: {probeGuess.shape}")
+    print(f"objectGuess: {objectGuess.shape}")
+    print(f"scanCoordinates: {scanCoordinates.shape}")
+
     xcoords = np.array([p.x for p in scanCoordinates])
     ycoords = np.array([p.y for p in scanCoordinates])
     if objectGuess is not None:
