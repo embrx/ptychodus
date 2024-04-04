@@ -120,7 +120,7 @@ class SLAC_NPZObjectFileReader(ObjectFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    SIMPLE_NAME: Final[str] = 'SLAC_NPZ'
+    SIMPLE_NAME: Final[str] = 'SLAC'
     DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'
 
     registry.diffractionFileReaders.registerPlugin(
